@@ -1,3 +1,4 @@
+
 import type { Server, Socket } from 'socket.io';
 import {
   INPUT_QUEUE_MAX,
@@ -103,6 +104,11 @@ export class Room {
     if (!this.interval) {
       this.start();
     }
+
+    // Immediately send the updated lobby to all players.
+    // This makes the new player visible without waiting
+    // for the next simulation snapshot.
+    this.broadcastSnapshot(); // ADDED
   }
 
   leave(socketId: string): void {
@@ -302,6 +308,7 @@ export class Room {
                 event.newItId,
 
               x: event.x,
+
               y: event.y,
             });
           }
@@ -431,6 +438,7 @@ export class Room {
         'snapshot',
         {
           ...base,
+
           lastSeq:
             this.state.players[id]
               ?.lastSeq ?? 0,
