@@ -85,7 +85,7 @@ export class LocalPredictor {
     const self = snapshot.players.find((player) => player.id === this.selfId);
     if (!self) return;
     this.spectator = self.spectator;
-    this.frozen = snapshot.phase === 'countdown' || snapshot.phase === 'podium';
+    this.frozen = snapshot.phase === 'countdown' || snapshot.phase === 'gameover';
 
     const body: MovableBody = {
       x: self.x,

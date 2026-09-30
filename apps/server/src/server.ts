@@ -70,7 +70,7 @@ export async function createGameServer(
 
     const joinBucket = new TokenBucket(3, 0.5);
 
-    socket.on('join', (raw, ack) => {
+    socket.on('join', (raw,ack) => {
       if (typeof ack !== 'function') return;
 
       if (!joinBucket.tryRemove()) {
@@ -187,12 +187,31 @@ export async function createGameServer(
 
       room.queueInput(socket.id, parsed.data);
     });
+    socket.on('privateDecisionResponse', (raw) => {
+  if (!room) return;
+
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    typeof (raw as any).eventId !== 'string' ||
+    ((raw as any).choice !== 'survivor' &&
+      (raw as any).choice !== 'zombie')
+  ) {
+    return;
+  }
+
+  room.submitPrivateDecision(
+    socket.id,
+    (raw as any).eventId,
+    (raw as any).choice,
+  );
+});
 
     socket.on('disconnect', () => {
       if (room) {
         manager.leave(room, socket.id);
         room = null;
-      }
+      }socket.on
     });
   });
 
