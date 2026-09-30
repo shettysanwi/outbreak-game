@@ -60,6 +60,7 @@ export class Room {
     this.inputQueues.set(socket.id, []);
     addPlayer(this.state, socket.id, nickname, this.options);
     void socket.join(this.code);
+
     if (!this.interval) this.start();
   }
 
@@ -67,21 +68,28 @@ export class Room {
     this.sockets.delete(socketId);
     this.inputQueues.delete(socketId);
     removePlayer(this.state, socketId);
+
     if (this.isEmpty) this.stop();
   }
 
-  /** Queue a validated input; one is consumed per tick. Bounded so a client cannot build a backlog. */
+  /** Queue a validated input; one is consumed per tick. */
   queueInput(socketId: string, input: InputMessage): void {
     const queue = this.inputQueues.get(socketId);
     if (!queue) return;
-    if (queue.length >= INPUT_QUEUE_MAX) queue.shift();
+
+    if (queue.length >= INPUT_QUEUE_MAX) {
+      queue.shift();
+    }
+
     queue.push(input);
   }
 
   start(): void {
     this.lastPumpAt = Date.now();
     this.accumulatorMs = 0;
-    // Pump twice per tick; the accumulator turns wall time into exact fixed steps.
+
+    // Pump twice per tick; the accumulator turns wall time
+    // into exact fixed steps.
     this.interval = setInterval(this.pump, TICK_MS / 2);
   }
 
@@ -94,11 +102,17 @@ export class Room {
 
   private readonly pump = (): void => {
     const now = Date.now();
+
     let elapsed = now - this.lastPumpAt;
     this.lastPumpAt = now;
+
     // Cap catch-up work after event-loop stalls instead of spiraling.
-    if (elapsed > 250) elapsed = 250;
+    if (elapsed > 250) {
+      elapsed = 250;
+    }
+
     this.accumulatorMs += elapsed;
+
     while (this.accumulatorMs >= TICK_MS) {
       this.accumulatorMs -= TICK_MS;
       this.tick();
@@ -108,16 +122,27 @@ export class Room {
   private tick(): void {
     this.tickCount += 1;
 
+    // Apply queued inputs.
     for (const [id, player] of Object.entries(this.state.players)) {
       const input = this.inputQueues.get(id)?.shift();
+
       if (input) {
         player.input = input;
         player.lastSeq = input.seq;
       }
-      // No fresh input: the last one keeps applying (a held key stays held).
+
+      // No fresh input:
+      // the previous input keeps applying.
     }
 
-    const events = stepRoom(this.state, TICK_MS, this.options);
+    // Advance the authoritative simulation.
+    const events = stepRoom(
+      this.state,
+      TICK_MS,
+      this.options,
+    );
+
+    // Handle simulation events.
     for (const event of events) {
       if (event.type === 'tag') {
         for (const socket of this.sockets.values()) {
@@ -129,13 +154,38 @@ export class Room {
           });
         }
       }
+
+      /*
+       * IMPORTANT:
+       *
+       * When the last survivor becomes infected,
+       * sim.ts creates:
+       *
+       * { type: 'gameOver', winner: 'zombies' }
+       *
+       * The old room.ts ignored this event.
+       *
+       * This broadcasts the result to every connected player.
+       */
+      if (event.type === 'gameOver') {
+        for (const socket of this.sockets.values()) {
+          socket.emit('gameOver', {
+            winner: event.winner,
+          });
+        }
+      }
     }
 
-    if (this.tickCount % SNAPSHOT_EVERY === 0) this.broadcastSnapshot();
+    // Broadcast the updated state.
+    if (this.tickCount % SNAPSHOT_EVERY === 0) {
+      this.broadcastSnapshot();
+    }
   }
 
   private broadcastSnapshot(): void {
-    const players: PlayerSnapshot[] = Object.values(this.state.players).map((player) => ({
+    const players: PlayerSnapshot[] = Object.values(
+      this.state.players,
+    ).map((player) => ({
       id: player.id,
       nickname: player.nickname,
       colorIndex: player.colorIndex,
@@ -144,24 +194,37 @@ export class Room {
       stamina: player.stamina,
       sprinting: player.sprinting,
       spectator: player.spectator,
+
+      // Zombie Survival state
       role: player.role,
       hasVaccine: player.hasVaccine,
+
       scoreMs: player.scoreMs,
     }));
 
     const base: Omit<Snapshot, 'lastSeq'> = {
       tick: this.tickCount,
       phase: this.state.phase,
-      phaseRemainingMs: Math.max(0, Math.round(this.state.phaseRemainingMs)),
+      phaseRemainingMs: Math.max(
+        0,
+        Math.round(this.state.phaseRemainingMs),
+      ),
       roundNumber: this.state.roundNumber,
       itId: this.state.itId,
-      immunityMs: Math.max(0, Math.round(this.state.immunityRemainingMs)),
+      immunityMs: Math.max(
+        0,
+        Math.round(this.state.immunityRemainingMs),
+      ),
       players,
       podium: this.state.podium,
     };
 
     for (const [id, socket] of this.sockets) {
-      socket.emit('snapshot', { ...base, lastSeq: this.state.players[id]?.lastSeq ?? 0 });
+      socket.emit('snapshot', {
+        ...base,
+        lastSeq: this.state.players[id]?.lastSeq ?? 0,
+      });
     }
   }
 }
+

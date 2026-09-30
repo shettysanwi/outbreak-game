@@ -1,71 +1,98 @@
 import type { Rect, Vec2 } from './types';
 
-/** Arena size in world units. */
-export const ARENA_WIDTH = 1600;
-export const ARENA_HEIGHT = 900;
+export const ARENA_WIDTH = 1200;
+export const ARENA_HEIGHT = 700;
 
 export const PLAYER_RADIUS = 18;
 
-/** Base movement speed in world units per second. */
-export const BASE_SPEED = 230;
+export const BASE_SPEED = 180;
 export const SPRINT_MULTIPLIER = 1.6;
 
 export const STAMINA_MAX = 100;
 export const STAMINA_DRAIN_PER_S = 35;
-export const STAMINA_REGEN_PER_S = 22;
-/** Minimum stamina required to start sprinting (hysteresis so sprint does not flicker at 0). */
+export const STAMINA_REGEN_PER_S = 20;
 export const STAMINA_SPRINT_MIN = 10;
 
-/** After a tag, the new chaser cannot tag anyone for this long. */
-export const TAG_COOLDOWN_MS = 3000;
+export const COUNTDOWN_MS = 5000;
 
-/** Authoritative simulation rate. */
-export const TICK_RATE = 60;
-export const TICK_MS = 1000 / TICK_RATE;
-/** Snapshot broadcast rate. */
-export const SNAPSHOT_RATE = 20;
-export const SNAPSHOT_EVERY = TICK_RATE / SNAPSHOT_RATE;
+/*
+ * Zombie Survival:
+ * 10 minute round
+ */
+export const ROUND_MS = 10 * 60 * 1000;
 
-/** How far in the past remote players are rendered (interpolation buffer). */
-export const INTERP_DELAY_MS = 100;
-
-export const COUNTDOWN_MS = 3000;
-export const ROUND_MS = 90_000;
 export const PODIUM_MS = 8000;
 
-export const MAX_PLAYERS_PER_ROOM = 8;
-export const MAX_NICKNAME_LENGTH = 16;
+export const TAG_COOLDOWN_MS = 1000;
+
+/*
+ * Original project/server constants
+ */
+export const TICK_MS = 50;
+
+export const SNAPSHOT_EVERY = 2;
+
+export const INPUT_QUEUE_MAX = 120;
+
+export const MAX_PLAYERS_PER_ROOM = 16;
+
 export const ROOM_CODE_LENGTH = 4;
 
-/** Server keeps at most this many unprocessed inputs per player (one is consumed per tick). */
-export const INPUT_QUEUE_MAX = 8;
+export const MAX_NICKNAME_LENGTH = 16;
 
-/** Distinct player colors on a dark arena. */
+export const INTERP_DELAY_MS = 100;
+
 export const PLAYER_COLORS = [
-  '#38bdf8',
   '#4ade80',
-  '#facc15',
-  '#c084fc',
-  '#fb923c',
+  '#60a5fa',
   '#f472b6',
+  '#facc15',
+  '#a78bfa',
+  '#fb923c',
   '#2dd4bf',
-  '#a3e635',
-] as const;
-
-export const OBSTACLES: readonly Rect[] = [
-  { x: 380, y: 200, w: 120, h: 260 },
-  { x: 1100, y: 440, w: 120, h: 260 },
-  { x: 700, y: 90, w: 200, h: 90 },
-  { x: 700, y: 720, w: 200, h: 90 },
+  '#f87171',
 ];
 
 export const SPAWN_POINTS: readonly Vec2[] = [
-  { x: 200, y: 200 },
-  { x: 1400, y: 700 },
-  { x: 1400, y: 200 },
-  { x: 200, y: 700 },
-  { x: 800, y: 450 },
-  { x: 200, y: 450 },
-  { x: 1400, y: 450 },
-  { x: 620, y: 620 },
+  { x: 120, y: 120 },
+  { x: 1080, y: 120 },
+  { x: 120, y: 580 },
+  { x: 1080, y: 580 },
+  { x: 600, y: 120 },
+  { x: 600, y: 580 },
+  { x: 300, y: 350 },
+  { x: 900, y: 350 },
+];
+
+export const OBSTACLES: readonly Rect[] = [
+  {
+    x: 250,
+    y: 150,
+    w: 180,
+    h: 40,
+  },
+  {
+    x: 770,
+    y: 150,
+    w: 180,
+    h: 40,
+  },
+  {
+    x: 250,
+    y: 510,
+    w: 180,
+    h: 40,
+  },
+  {
+    x: 770,
+    y: 510,
+    w: 180,
+    h: 40,
+  },
+  {
+    x: 540,
+    y: 280,
+    w: 120,
+    h: 140,
+  },
 ];
