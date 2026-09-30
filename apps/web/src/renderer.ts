@@ -108,7 +108,7 @@ export class Renderer {
             y = interpolated.y;
           }
         }
-        const isIt = snapshot.itId === player.id;
+        const isIt = player.role === 'zombie';
         this.drawPlayer(ctx, {
           x,
           y,

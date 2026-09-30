@@ -144,6 +144,8 @@ export class Room {
       stamina: player.stamina,
       sprinting: player.sprinting,
       spectator: player.spectator,
+      role: player.role,
+      hasVaccine: player.hasVaccine,
       scoreMs: player.scoreMs,
     }));
 
