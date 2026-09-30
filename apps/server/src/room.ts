@@ -8,7 +8,9 @@ import {
   defaultSimOptions,
   removePlayer,
   stepRoom,
+  startGame as startSimGame,
 } from '@tag-game/shared';
+
 import type {
   ClientToServerEvents,
   InputMessage,
@@ -16,10 +18,18 @@ import type {
   ServerToClientEvents,
   SimOptions,
   Snapshot,
+  StartGameResult,
 } from '@tag-game/shared';
 
-export type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;
-export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+export type GameServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents
+>;
+
+export type GameSocket = Socket<
+  ClientToServerEvents,
+  ServerToClientEvents
+>;
 
 /**
  * One room = one authoritative simulation.
@@ -32,19 +42,29 @@ export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
  */
 export class Room {
   readonly state = createRoomState();
+
   private readonly options: SimOptions;
-  private readonly sockets = new Map<string, GameSocket>();
-  private readonly inputQueues = new Map<string, InputMessage[]>();
+  private readonly sockets =
+    new Map<string, GameSocket>();
+
+  private readonly inputQueues =
+    new Map<string, InputMessage[]>();
+
   private tickCount = 0;
   private accumulatorMs = 0;
   private lastPumpAt = 0;
   private interval: NodeJS.Timeout | null = null;
 
+  private hostId: string | null = null;
+
   constructor(
     readonly code: string,
     overrides: Partial<SimOptions> = {},
   ) {
-    this.options = { ...defaultSimOptions(), ...overrides };
+    this.options = {
+      ...defaultSimOptions(),
+      ...overrides,
+    };
   }
 
   get playerCount(): number {
@@ -55,26 +75,130 @@ export class Room {
     return this.sockets.size === 0;
   }
 
-  join(socket: GameSocket, nickname: string): void {
+  getHostId(): string | null {
+    return this.hostId;
+  }
+
+  join(
+    socket: GameSocket,
+    nickname: string,
+  ): void {
     this.sockets.set(socket.id, socket);
     this.inputQueues.set(socket.id, []);
-    addPlayer(this.state, socket.id, nickname, this.options);
+
+    addPlayer(
+      this.state,
+      socket.id,
+      nickname,
+      this.options,
+    );
+
+    // First player becomes host.
+    if (!this.hostId) {
+      this.hostId = socket.id;
+    }
+
     void socket.join(this.code);
 
-    if (!this.interval) this.start();
+    if (!this.interval) {
+      this.start();
+    }
   }
 
   leave(socketId: string): void {
     this.sockets.delete(socketId);
     this.inputQueues.delete(socketId);
-    removePlayer(this.state, socketId);
 
-    if (this.isEmpty) this.stop();
+    removePlayer(
+      this.state,
+      socketId,
+    );
+
+    // If the host leaves, give host control
+    // to the first remaining player.
+    if (this.hostId === socketId) {
+      const remainingPlayers =
+        Object.values(this.state.players);
+
+      this.hostId =
+        remainingPlayers[0]?.id ?? null;
+    }
+
+    if (this.isEmpty) {
+      this.hostId = null;
+      this.stop();
+    }
+  }
+
+  /**
+   * Called by the server when a player presses
+   * Start Game.
+   */
+  startGame(
+    socketId: string,
+  ): StartGameResult {
+    if (this.hostId !== socketId) {
+      return {
+        ok: false,
+        error:
+          'Only the host can start the game.',
+      };
+    }
+
+    if (this.state.phase !== 'waiting') {
+      return {
+        ok: false,
+        error:
+          'The game has already started.',
+      };
+    }
+
+    if (this.playerCount < 2) {
+      return {
+        ok: false,
+        error:
+          'At least 2 players are required to start.',
+      };
+    }
+
+    /*
+     * Use the shared simulation startGame()
+     * so that the real server initializes:
+     *
+     * - player roles
+     * - initial zombie
+     * - spawn positions
+     * - vaccine state
+     * - round number
+     * - countdown timer
+     */
+    const events = startSimGame(
+      this.state,
+      this.options,
+    );
+
+    if (events.length === 0) {
+      return {
+        ok: false,
+        error: 'Could not start the game.',
+      };
+    }
+
+    this.broadcastSnapshot();
+
+    return {
+      ok: true,
+    };
   }
 
   /** Queue a validated input; one is consumed per tick. */
-  queueInput(socketId: string, input: InputMessage): void {
-    const queue = this.inputQueues.get(socketId);
+  queueInput(
+    socketId: string,
+    input: InputMessage,
+  ): void {
+    const queue =
+      this.inputQueues.get(socketId);
+
     if (!queue) return;
 
     if (queue.length >= INPUT_QUEUE_MAX) {
@@ -90,7 +214,10 @@ export class Room {
 
     // Pump twice per tick; the accumulator turns wall time
     // into exact fixed steps.
-    this.interval = setInterval(this.pump, TICK_MS / 2);
+    this.interval = setInterval(
+      this.pump,
+      TICK_MS / 2,
+    );
   }
 
   stop(): void {
@@ -103,17 +230,22 @@ export class Room {
   private readonly pump = (): void => {
     const now = Date.now();
 
-    let elapsed = now - this.lastPumpAt;
+    let elapsed =
+      now - this.lastPumpAt;
+
     this.lastPumpAt = now;
 
-    // Cap catch-up work after event-loop stalls instead of spiraling.
+    // Cap catch-up work after event-loop stalls
+    // instead of spiraling.
     if (elapsed > 250) {
       elapsed = 250;
     }
 
     this.accumulatorMs += elapsed;
 
-    while (this.accumulatorMs >= TICK_MS) {
+    while (
+      this.accumulatorMs >= TICK_MS
+    ) {
       this.accumulatorMs -= TICK_MS;
       this.tick();
     }
@@ -123,8 +255,14 @@ export class Room {
     this.tickCount += 1;
 
     // Apply queued inputs.
-    for (const [id, player] of Object.entries(this.state.players)) {
-      const input = this.inputQueues.get(id)?.shift();
+    for (const [
+      id,
+      player,
+    ] of Object.entries(this.state.players)) {
+      const input =
+        this.inputQueues
+          .get(id)
+          ?.shift();
 
       if (input) {
         player.input = input;
@@ -135,96 +273,169 @@ export class Room {
       // the previous input keeps applying.
     }
 
-    // Advance the authoritative simulation.
-    const events = stepRoom(
-      this.state,
-      TICK_MS,
-      this.options,
-    );
+    /*
+     * While waiting, do not advance the simulation.
+     *
+     * The host must explicitly press Start Game.
+     */
+    if (
+      this.state.phase !== 'waiting'
+    ) {
+      const events = stepRoom(
+        this.state,
+        TICK_MS,
+        this.options,
+      );
 
-    // Handle simulation events.
-    for (const event of events) {
-      if (event.type === 'tag') {
-        for (const socket of this.sockets.values()) {
-          socket.emit('tag', {
-            oldItId: event.oldItId,
-            newItId: event.newItId,
-            x: event.x,
-            y: event.y,
-          });
+      // Handle simulation events.
+      for (const event of events) {
+        if (event.type === 'tag') {
+          for (
+            const socket of
+            this.sockets.values()
+          ) {
+            socket.emit('tag', {
+              oldItId:
+                event.oldItId,
+
+              newItId:
+                event.newItId,
+
+              x: event.x,
+              y: event.y,
+            });
+          }
         }
-      }
 
-      /*
-       * IMPORTANT:
-       *
-       * When the last survivor becomes infected,
-       * sim.ts creates:
-       *
-       * { type: 'gameOver', winner: 'zombies' }
-       *
-       * The old room.ts ignored this event.
-       *
-       * This broadcasts the result to every connected player.
-       */
-      if (event.type === 'gameOver') {
-        for (const socket of this.sockets.values()) {
-          socket.emit('gameOver', {
-            winner: event.winner,
-          });
+        /*
+         * When the last survivor becomes infected,
+         * sim.ts creates:
+         *
+         * {
+         *   type: 'gameOver',
+         *   winner: 'zombies'
+         * }
+         *
+         * Broadcast the result to every connected player.
+         */
+        if (
+          event.type === 'gameOver'
+        ) {
+          for (
+            const socket of
+            this.sockets.values()
+          ) {
+            socket.emit(
+              'gameOver',
+              {
+                winner:
+                  event.winner,
+              },
+            );
+          }
         }
       }
     }
 
-    // Broadcast the updated state.
-    if (this.tickCount % SNAPSHOT_EVERY === 0) {
+    // Broadcast updated state.
+    if (
+      this.tickCount %
+        SNAPSHOT_EVERY ===
+      0
+    ) {
       this.broadcastSnapshot();
     }
   }
 
   private broadcastSnapshot(): void {
-    const players: PlayerSnapshot[] = Object.values(
-      this.state.players,
-    ).map((player) => ({
-      id: player.id,
-      nickname: player.nickname,
-      colorIndex: player.colorIndex,
-      x: player.x,
-      y: player.y,
-      stamina: player.stamina,
-      sprinting: player.sprinting,
-      spectator: player.spectator,
+    const players: PlayerSnapshot[] =
+      Object.values(
+        this.state.players,
+      ).map((player) => ({
+        id: player.id,
+        nickname: player.nickname,
+        colorIndex:
+          player.colorIndex,
 
-      // Zombie Survival state
-      role: player.role,
-      hasVaccine: player.hasVaccine,
+        x: player.x,
+        y: player.y,
 
-      scoreMs: player.scoreMs,
-    }));
+        stamina:
+          player.stamina,
 
-    const base: Omit<Snapshot, 'lastSeq'> = {
-      tick: this.tickCount,
-      phase: this.state.phase,
-      phaseRemainingMs: Math.max(
-        0,
-        Math.round(this.state.phaseRemainingMs),
-      ),
-      roundNumber: this.state.roundNumber,
-      itId: this.state.itId,
-      immunityMs: Math.max(
-        0,
-        Math.round(this.state.immunityRemainingMs),
-      ),
+        sprinting:
+          player.sprinting,
+
+        spectator:
+          player.spectator,
+
+        // Zombie Survival state
+        role:
+          player.role,
+
+        hasVaccine:
+          player.hasVaccine,
+
+        scoreMs:
+          player.scoreMs,
+      }));
+
+    const base:
+      Omit<Snapshot, 'lastSeq'> = {
+      tick:
+        this.tickCount,
+
+      phase:
+        this.state.phase,
+
+      phaseRemainingMs:
+        Math.max(
+          0,
+          Math.round(
+            this.state
+              .phaseRemainingMs,
+          ),
+        ),
+
+      roundNumber:
+        this.state.roundNumber,
+
+      hostId:
+        this.hostId,
+
+      itId:
+        this.state.itId,
+
+      immunityMs:
+        Math.max(
+          0,
+          Math.round(
+            this.state
+              .immunityRemainingMs,
+          ),
+        ),
+
       players,
-      podium: this.state.podium,
+
+      podium:
+        this.state.podium,
     };
 
-    for (const [id, socket] of this.sockets) {
-      socket.emit('snapshot', {
-        ...base,
-        lastSeq: this.state.players[id]?.lastSeq ?? 0,
-      });
+    for (
+      const [
+        id,
+        socket,
+      ] of this.sockets
+    ) {
+      socket.emit(
+        'snapshot',
+        {
+          ...base,
+          lastSeq:
+            this.state.players[id]
+              ?.lastSeq ?? 0,
+        },
+      );
     }
   }
 }
-

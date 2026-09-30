@@ -1,15 +1,20 @@
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
+
 import type {
   ClientToServerEvents,
   InputMessage,
   JoinResult,
   ServerToClientEvents,
   Snapshot,
+  StartGameResult,
   TagBroadcast,
 } from '@tag-game/shared';
 
-type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+type GameSocket = Socket<
+  ServerToClientEvents,
+  ClientToServerEvents
+>;
 
 /** Thin typed wrapper around the socket.io connection. */
 export class NetClient {
@@ -21,31 +26,92 @@ export class NetClient {
         resolve();
         return;
       }
+
       const socket: GameSocket = this.socket ?? io();
+
       this.socket = socket;
+
       const timer = setTimeout(() => {
         reject(new Error('Could not reach the server.'));
       }, 8000);
+
       socket.once('connect', () => {
         clearTimeout(timer);
         resolve();
       });
+
       socket.once('connect_error', (error) => {
         clearTimeout(timer);
-        reject(error instanceof Error ? error : new Error('Connection failed.'));
+
+        reject(
+          error instanceof Error
+            ? error
+            : new Error('Connection failed.'),
+        );
       });
     });
   }
 
-  join(nickname: string, roomCode?: string): Promise<JoinResult> {
+  join(
+    nickname: string,
+    roomCode?: string,
+  ): Promise<JoinResult> {
     const socket = this.socket;
-    if (!socket) return Promise.resolve({ ok: false, error: 'Not connected.' });
-    return new Promise((resolve) => {
-      const message = roomCode ? { nickname, roomCode } : { nickname };
-      socket.timeout(8000).emit('join', message, (error, result) => {
-        if (error || !result) resolve({ ok: false, error: 'Join timed out.' });
-        else resolve(result);
+
+    if (!socket) {
+      return Promise.resolve({
+        ok: false,
+        error: 'Not connected.',
       });
+    }
+
+    return new Promise((resolve) => {
+      const message = roomCode
+        ? { nickname, roomCode }
+        : { nickname };
+
+      socket.timeout(8000).emit(
+        'join',
+        message,
+        (error, result) => {
+          if (error || !result) {
+            resolve({
+              ok: false,
+              error: 'Join timed out.',
+            });
+          } else {
+            resolve(result);
+          }
+        },
+      );
+    });
+  }
+
+  startGame(): Promise<StartGameResult> {
+    const socket = this.socket;
+
+    if (!socket) {
+      return Promise.resolve({
+        ok: false,
+        error: 'Not connected.',
+      });
+    }
+
+    return new Promise((resolve) => {
+      socket.timeout(8000).emit(
+        'startGame',
+        {},
+        (error, result) => {
+          if (error || !result) {
+            resolve({
+              ok: false,
+              error: 'Start game request timed out.',
+            });
+          } else {
+            resolve(result);
+          }
+        },
+      );
     });
   }
 
@@ -54,11 +120,15 @@ export class NetClient {
     this.socket?.volatile.emit('input', input);
   }
 
-  onSnapshot(handler: (snapshot: Snapshot) => void): void {
+  onSnapshot(
+    handler: (snapshot: Snapshot) => void,
+  ): void {
     this.socket?.on('snapshot', handler);
   }
 
-  onTag(handler: (event: TagBroadcast) => void): void {
+  onTag(
+    handler: (event: TagBroadcast) => void,
+  ): void {
     this.socket?.on('tag', handler);
   }
 

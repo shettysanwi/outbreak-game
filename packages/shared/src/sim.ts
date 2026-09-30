@@ -93,8 +93,18 @@ export function addPlayer(
     y: spawn.y,
     stamina: STAMINA_MAX,
     sprinting: false,
+
+    /*
+     * New players can join only while the room
+     * is in the waiting phase.
+     *
+     * Once the game has started, server.ts
+     * rejects additional joins.
+     */
     spectator:
-      state.phase === 'playing' || state.phase === 'podium',
+      state.phase === 'playing' ||
+      state.phase === 'podium',
+
     role: 'survivor',
     hasVaccine: false,
     scoreMs: 0,
@@ -331,6 +341,16 @@ function computePodium(
     }));
 }
 
+/*
+ * Starts the actual countdown.
+ *
+ * IMPORTANT:
+ * This function is NOT called automatically
+ * when the second player joins.
+ *
+ * The server's Room.startGame() controls when
+ * this happens.
+ */
 function startCountdown(
   state: RoomState,
   options: SimOptions,
@@ -375,12 +395,14 @@ function startCountdown(
   );
 
   const chosen =
-    players[
-      Math.floor(
-        options.rng() *
-          players.length,
-      )
-    ];
+    players.length > 0
+      ? players[
+          Math.floor(
+            options.rng() *
+              players.length,
+          )
+        ]
+      : undefined;
 
   state.itId = chosen
     ? chosen.id
@@ -413,6 +435,29 @@ function backToWaiting(
   });
 }
 
+export function startGame(
+  state: RoomState,
+  options: SimOptions,
+): SimEvent[] {
+  if (state.phase !== 'waiting') {
+    return [];
+  }
+
+  if (activePlayers(state).length < 2) {
+    return [];
+  }
+
+  const events: SimEvent[] = [];
+
+  startCountdown(
+    state,
+    options,
+    events,
+  );
+
+  return events;
+}
+
 export function stepRoom(
   state: RoomState,
   dtMs: number,
@@ -424,23 +469,20 @@ export function stepRoom(
     activePlayers(state);
 
   switch (state.phase) {
+    /*
+     * LOBBY
+     *
+     * IMPORTANT:
+     * Do NOT start the game here.
+     *
+     * The host must explicitly press
+     * START GAME.
+     */
     case 'waiting': {
-      for (const player of active) {
-        stepBody(
-          player,
-          dtMs,
-          options.obstacles,
-        );
-      }
-
-      if (active.length >= 2) {
-        startCountdown(
-          state,
-          options,
-          events,
-        );
-      }
-
+      /*
+       * Players stay completely still in the
+       * lobby. No countdown is started here.
+       */
       break;
     }
 
@@ -520,7 +562,8 @@ export function stepRoom(
         INITIAL_INFECTION_MS;
 
       /*
-       * VACCINE:
+       * VACCINE
+       *
        * A survivor with a vaccine can touch
        * a zombie and turn that zombie back
        * into a survivor.
@@ -577,7 +620,8 @@ export function stepRoom(
       }
 
       /*
-       * INFECTION:
+       * INFECTION
+       *
        * Zombie infection is active only
        * during the first 60 seconds.
        */
@@ -638,7 +682,8 @@ export function stepRoom(
       }
 
       /*
-       * IMMEDIATE ZOMBIE WIN:
+       * IMMEDIATE ZOMBIE WIN
+       *
        * If every active player is infected,
        * end the round immediately.
        */
@@ -674,10 +719,7 @@ export function stepRoom(
       }
 
       /*
-       * NORMAL 10-MINUTE END:
-       * If at least one survivor remains
-       * when the timer reaches zero,
-       * survivors win.
+       * NORMAL 10-MINUTE END
        */
       state.phaseRemainingMs -=
         dtMs;
@@ -721,6 +763,10 @@ export function stepRoom(
             state.players,
           ).length >= 2
         ) {
+          /*
+           * After a completed round, a new
+           * round may begin automatically.
+           */
           startCountdown(
             state,
             options,
