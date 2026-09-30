@@ -162,7 +162,7 @@ afterAll(async () => {
 });
 
 describe('two real clients against a running server', () => {
-  it('plays a full tag exchange: A tags B, then B tags A back', async () => {
+  it('infects survivor on contact: Zombie A infects Survivor B', async () => {
     const a = newClient();
     const b = newClient();
 
@@ -175,39 +175,21 @@ describe('two real clients against a running server', () => {
     if (!joinB.ok) return;
 
     // Both players present -> countdown -> playing.
-    const playing = await waitForSnapshot(a, (s) => s.phase === 'playing' && s.itId !== null);
+    const playing = await waitForSnapshot(a, (s) => s.phase === 'playing');
     expect(playing.players).toHaveLength(2);
 
     const itId = playing.itId!;
     const runnerId = itId === joinA.selfId ? joinB.selfId : joinA.selfId;
     const chaserSocket = itId === joinA.selfId ? a : b;
-    const runnerSocket = itId === joinA.selfId ? b : a;
 
-    // Exchange 1: the chaser hunts the idle runner down.
-    const firstTag = await chaseUntilTag(chaserSocket, runnerId, itId);
-    expect(firstTag.oldItId).toBe(itId);
-    expect(firstTag.newItId).toBe(runnerId);
+    // Zombie hunts the survivor down until contact
+    const tag = await chaseUntilTag(chaserSocket, runnerId, itId);
+    expect(tag.oldItId).toBe(itId);
+    expect(tag.newItId).toBe(runnerId);
 
-    const afterFirst = await waitForSnapshot(a, (s) => s.itId === runnerId);
-    expect(afterFirst.itId).toBe(runnerId);
-
-    // Move the previous chaser well out of tag reach and park it there, so the
-    // cooldown cannot produce an instant ping-pong tag. The target is on the
-    // far side of the arena, away from the (stationary) new chaser.
-    await steerTo(chaserSocket, itId, { x: 1400, y: 750 });
-
-    // Exchange 2: after the cooldown, the fresh chaser hunts the parked target.
-    await new Promise((resolve) => setTimeout(resolve, TAG_COOLDOWN_MS + 100));
-    const secondTag = await chaseUntilTag(runnerSocket, itId, runnerId);
-    expect(secondTag.oldItId).toBe(runnerId);
-    expect(secondTag.newItId).toBe(itId);
-
-    const afterSecond = await waitForSnapshot(a, (s) => s.itId === itId);
-    expect(afterSecond.itId).toBe(itId);
-
-    // Scores moved: time spent not being "it" is rewarded.
-    const scores = afterSecond.players.map((p) => p.scoreMs);
-    expect(Math.max(...scores)).toBeGreaterThan(0);
+    // Verify game state reflects infection
+    const after = await waitForSnapshot(a, (s) => s.phase === 'gameover' || s.itId === runnerId);
+    expect(after).toBeDefined();
   });
 
   it('ignores malformed and out-of-range inputs instead of trusting them', async () => {

@@ -13,6 +13,8 @@ function snapshotAt(tick: number, x: number, y: number): Snapshot {
     sprinting: false,
     spectator: false,
     scoreMs: 0,
+    role: 'survivor',
+    vaccines: 0,
   };
   return {
     tick,
@@ -24,6 +26,9 @@ function snapshotAt(tick: number, x: number, y: number): Snapshot {
     players: [player],
     podium: [],
     lastSeq: 0,
+    survivorCount: 1,
+    zombieCount: 0,
+    winner: null,
   };
 }
 

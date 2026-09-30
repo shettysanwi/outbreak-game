@@ -16,8 +16,10 @@ export const STAMINA_REGEN_PER_S = 22;
 /** Minimum stamina required to start sprinting (hysteresis so sprint does not flicker at 0). */
 export const STAMINA_SPRINT_MIN = 10;
 
-/** After a tag, the new chaser cannot tag anyone for this long. */
+/** After a tag / immunity trigger, immunity duration. */
 export const TAG_COOLDOWN_MS = 3000;
+/** Grace period immunity after a vaccine is consumed to prevent immediate re-infection. */
+export const VACCINE_IMMUNITY_MS = 3000;
 
 /** Authoritative simulation rate. */
 export const TICK_RATE = 60;
@@ -30,8 +32,18 @@ export const SNAPSHOT_EVERY = TICK_RATE / SNAPSHOT_RATE;
 export const INTERP_DELAY_MS = 100;
 
 export const COUNTDOWN_MS = 3000;
-export const ROUND_MS = 90_000;
-export const PODIUM_MS = 8000;
+/** Total match duration: 10 minutes (600,000 ms). */
+export const GAME_DURATION_MS = 10 * 60 * 1000;
+export const ROUND_MS = GAME_DURATION_MS;
+
+/** Interval between private decision offers: 2 minutes (120,000 ms). */
+export const DECISION_INTERVAL_MS = 2 * 60 * 1000;
+/** Time limit for the chosen player to make a private decision (15 seconds). */
+export const DECISION_TIMEOUT_MS = 15_000;
+
+/** Duration of the game-over screen before returning to lobby (12 seconds). */
+export const GAMEOVER_MS = 12_000;
+export const PODIUM_MS = GAMEOVER_MS;
 
 export const MAX_PLAYERS_PER_ROOM = 8;
 export const MAX_NICKNAME_LENGTH = 16;
@@ -40,7 +52,7 @@ export const ROOM_CODE_LENGTH = 4;
 /** Server keeps at most this many unprocessed inputs per player (one is consumed per tick). */
 export const INPUT_QUEUE_MAX = 8;
 
-/** Distinct player colors on a dark arena. */
+/** Distinct player colors on a dark arena for Survivors. */
 export const PLAYER_COLORS = [
   '#38bdf8',
   '#4ade80',
@@ -51,6 +63,14 @@ export const PLAYER_COLORS = [
   '#2dd4bf',
   '#a3e635',
 ] as const;
+
+/** Zombie visual theme colors. */
+export const ZOMBIE_COLOR = '#22c55e';
+export const ZOMBIE_GLOW = 'rgba(34, 197, 94, 0.9)';
+
+/** Survivor shield visual theme colors. */
+export const SURVIVOR_SHIELD_COLOR = '#38bdf8';
+export const SURVIVOR_SHIELD_GLOW = 'rgba(56, 189, 248, 0.85)';
 
 export const OBSTACLES: readonly Rect[] = [
   { x: 380, y: 200, w: 120, h: 260 },

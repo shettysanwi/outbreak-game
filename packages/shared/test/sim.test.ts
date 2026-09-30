@@ -20,11 +20,14 @@ import {
 import type { MovableBody, RoomState, SimEvent, SimOptions } from '../src/index';
 
 function testOptions(overrides: Partial<SimOptions> = {}): SimOptions {
+  const roundMs = overrides.roundMs ?? 10_000;
   return {
     ...defaultSimOptions(),
     countdownMs: 100,
-    roundMs: 10_000,
+    roundMs,
+    gameDurationMs: overrides.gameDurationMs ?? roundMs,
     podiumMs: 100,
+    gameoverMs: 100,
     tagCooldownMs: 500,
     rng: () => 0, // deterministic: first player (by join order) becomes "it"
     ...overrides,
@@ -187,11 +190,14 @@ describe('room phases and tag rules', () => {
     expect(events.some((e) => e.type === 'phase' && e.phase === 'countdown')).toBe(true);
     expect(events.some((e) => e.type === 'phase' && e.phase === 'playing')).toBe(true);
     expect(state.phase).toBe('playing');
-    expect(state.itId).toBe('a'); // rng() => 0 picks the first joiner
+    expect(state.players['a']!.role).toBe('zombie'); // rng() => 0 picks the first joiner as Patient Zero
+    expect(state.players['b']!.role).toBe('survivor');
+    expect(state.survivorCount).toBe(1);
+    expect(state.zombieCount).toBe(1);
     expect(state.immunityRemainingMs).toBeGreaterThan(0);
   });
 
-  it('tags on contact after immunity, flips "it" and restarts the cooldown', () => {
+  it('infects survivor on contact without vaccine, converting role to zombie', () => {
     const options = testOptions();
     const state = createRoomState();
     addPlayer(state, 'a', 'Ada', options);
@@ -199,22 +205,34 @@ describe('room phases and tag rules', () => {
     run(state, 200, options); // through countdown into playing
     run(state, options.tagCooldownMs, options); // burn initial immunity
 
-    const chaser = state.players['a']!;
-    const runner = state.players['b']!;
-    chaser.x = 500;
-    chaser.y = 450;
-    runner.x = 500 + PLAYER_RADIUS * 2 - 1;
-    runner.y = 450;
+    const zombie = state.players['a']!;
+    const survivor = state.players['b']!;
+    expect(zombie.role).toBe('zombie');
+    expect(survivor.role).toBe('survivor');
+    expect(survivor.vaccines).toBe(0);
+
+    zombie.x = 500;
+    zombie.y = 450;
+    survivor.x = 500 + PLAYER_RADIUS * 2 - 1;
+    survivor.y = 450;
 
     const events = stepRoom(state, TICK_MS, options);
-    const tag = events.find((e) => e.type === 'tag');
-    expect(tag).toBeDefined();
-    expect(tag).toMatchObject({ oldItId: 'a', newItId: 'b' });
-    expect(state.itId).toBe('b');
-    expect(state.immunityRemainingMs).toBe(options.tagCooldownMs);
+    const infection = events.find((e) => e.type === 'infection');
+    expect(infection).toBeDefined();
+    expect(infection).toMatchObject({
+      zombieId: 'a',
+      victimId: 'b',
+      vaccineBlocked: false,
+    });
+    expect(survivor.role).toBe('zombie');
+    expect(state.zombieCount).toBe(2);
+    expect(state.survivorCount).toBe(0);
+    // Immediate Zombies Win when survivors reach 0
+    expect(state.phase).toBe('gameover');
+    expect(state.winner).toBe('zombies');
   });
 
-  it('does not allow an immediate tag-back during the cooldown', () => {
+  it('consumes a vaccine on contact, granting immunity and preventing infection', () => {
     const options = testOptions();
     const state = createRoomState();
     addPlayer(state, 'a', 'Ada', options);
@@ -222,17 +240,32 @@ describe('room phases and tag rules', () => {
     run(state, 200, options);
     run(state, options.tagCooldownMs, options);
 
-    state.players['a']!.x = 500;
-    state.players['a']!.y = 450;
-    state.players['b']!.x = 500 + PLAYER_RADIUS;
-    state.players['b']!.y = 450;
-    stepRoom(state, TICK_MS, options);
-    expect(state.itId).toBe('b');
+    const zombie = state.players['a']!;
+    const survivor = state.players['b']!;
+    survivor.vaccines = 1;
 
-    // Still overlapping on the next ticks, but immunity blocks the tag-back.
-    const events = run(state, options.tagCooldownMs / 2, options);
-    expect(events.filter((e) => e.type === 'tag')).toHaveLength(0);
-    expect(state.itId).toBe('b');
+    zombie.x = 500;
+    zombie.y = 450;
+    survivor.x = 500 + PLAYER_RADIUS;
+    survivor.y = 450;
+
+    const events = stepRoom(state, TICK_MS, options);
+    const infection = events.find((e) => e.type === 'infection');
+    expect(infection).toBeDefined();
+    expect(infection).toMatchObject({
+      zombieId: 'a',
+      victimId: 'b',
+      vaccineBlocked: true,
+    });
+    expect(survivor.vaccines).toBe(0);
+    expect(survivor.role).toBe('survivor');
+    expect(survivor.immunityRemainingMs).toBe(3000);
+    expect(state.survivorCount).toBe(1);
+
+    // Overlapping during immunity blocks infection
+    const nextEvents = run(state, 500, options);
+    expect(nextEvents.filter((e) => e.type === 'infection')).toHaveLength(0);
+    expect(survivor.role).toBe('survivor');
   });
 
   it('scores time NOT being it, and only during play', () => {
@@ -248,14 +281,18 @@ describe('room phases and tag rules', () => {
     expect(state.players['b']!.scoreMs).toBeGreaterThan(playedMs * 0.9);
   });
 
-  it('ends the round with a podium sorted by score', () => {
+  it('ends the round with a gameover phase and winner', () => {
     const options = testOptions({ roundMs: 500 });
     const state = createRoomState();
     addPlayer(state, 'a', 'Ada', options);
     addPlayer(state, 'b', 'Bob', options);
     run(state, 200, options);
-    const events = runUntil(state, options, () => state.phase === 'podium');
-    expect(events.some((e) => e.type === 'phase' && e.phase === 'podium')).toBe(true);
+    // Park survivor away so survivor is not infected
+    state.players['b']!.x = 1500;
+    state.players['b']!.y = 800;
+    const events = runUntil(state, options, () => state.phase === 'gameover');
+    expect(events.some((e) => e.type === 'phase' && e.phase === 'gameover')).toBe(true);
+    expect(state.winner).toBe('survivors');
     expect(state.podium[0]!.id).toBe('b');
     expect(state.podium[1]!.id).toBe('a');
   });
@@ -272,7 +309,7 @@ describe('room phases and tag rules', () => {
     expect(late.spectator).toBe(true);
     expect(state.players['c']!.scoreMs).toBe(0);
 
-    runUntil(state, options, () => state.phase === 'countdown'); // round -> podium -> countdown
+    runUntil(state, options, () => state.phase === 'countdown'); // round -> gameover -> countdown
     expect(state.players['c']!.spectator).toBe(false);
   });
 

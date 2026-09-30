@@ -44,7 +44,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Runn
     const inputBucket = new TokenBucket(INPUT_BUCKET_CAPACITY, INPUT_BUCKET_REFILL_PER_S);
     const joinBucket = new TokenBucket(3, 0.5);
 
-    socket.on('join', (raw, ack) => {
+    socket.on('join', (raw,ack) => {
       if (typeof ack !== 'function') return;
       if (!joinBucket.tryRemove()) {
         ack({ ok: false, error: 'Too many join attempts, slow down.' });
@@ -92,12 +92,31 @@ export async function createGameServer(options: GameServerOptions): Promise<Runn
       if (!parsed.success) return; // malformed: drop, never trust
       room.queueInput(socket.id, parsed.data);
     });
+    socket.on('privateDecisionResponse', (raw) => {
+  if (!room) return;
+
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    typeof (raw as any).eventId !== 'string' ||
+    ((raw as any).choice !== 'survivor' &&
+      (raw as any).choice !== 'zombie')
+  ) {
+    return;
+  }
+
+  room.submitPrivateDecision(
+    socket.id,
+    (raw as any).eventId,
+    (raw as any).choice,
+  );
+});
 
     socket.on('disconnect', () => {
       if (room) {
         manager.leave(room, socket.id);
         room = null;
-      }
+      }socket.on
     });
   });
 

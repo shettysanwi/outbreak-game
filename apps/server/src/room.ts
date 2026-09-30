@@ -54,6 +54,32 @@ export class Room {
   get isEmpty(): boolean {
     return this.sockets.size === 0;
   }
+    submitPrivateDecision(
+    playerId: string,
+    eventId: string,
+    choice: 'survivor' | 'zombie',
+  ): void {
+    const decision = this.state.activeDecision;
+
+    if (!decision) return;
+    if (decision.eventId !== eventId) return;
+    if (decision.targetPlayerId !== playerId) return;
+    if (Date.now() > decision.expiresAtMs) return;
+
+    const player = this.state.players[playerId];
+    if (!player || player.spectator) return;
+    if (player.role !== 'survivor') return;
+
+    player.role = choice;
+
+    if (choice === 'survivor') {
+      player.vaccines += 1;
+    } else {
+      player.vaccines = 0;
+    }
+
+    this.state.activeDecision = null;
+  }
 
   join(socket: GameSocket, nickname: string): void {
     this.sockets.set(socket.id, socket);
@@ -129,6 +155,21 @@ export class Room {
           });
         }
       }
+            if (event.type === 'decision_trigger') {
+        const decision = this.state.activeDecision;
+
+        if (decision) {
+          const socket = this.sockets.get(decision.targetPlayerId);
+
+          socket?.emit('privateDecisionOffer', {
+            eventId: decision.eventId,
+            timeLimitMs: Math.max(
+              0,
+              decision.expiresAtMs - Date.now(),
+            ),
+          });
+        }
+      }
     }
 
     if (this.tickCount % SNAPSHOT_EVERY === 0) this.broadcastSnapshot();
@@ -145,6 +186,8 @@ export class Room {
       sprinting: player.sprinting,
       spectator: player.spectator,
       scoreMs: player.scoreMs,
+      role: player.role,
+      vaccines: player.vaccines,
     }));
 
     const base: Omit<Snapshot, 'lastSeq'> = {
@@ -154,8 +197,11 @@ export class Room {
       roundNumber: this.state.roundNumber,
       itId: this.state.itId,
       immunityMs: Math.max(0, Math.round(this.state.immunityRemainingMs)),
-      players,
+            players,
       podium: this.state.podium,
+      survivorCount: this.state.survivorCount,
+      zombieCount: this.state.zombieCount,
+      winner: this.state.winner,
     };
 
     for (const [id, socket] of this.sockets) {

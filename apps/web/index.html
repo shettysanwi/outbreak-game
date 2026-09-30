@@ -2,148 +2,688 @@
 <html lang="en" class="h-full">
   <head>
     <meta charset="UTF-8" />
+
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>tag-game — authoritative multiplayer tag</title>
+
+    <title>OUTBREAK — Zombie Survival</title>
+
     <meta
       name="description"
-      content="Multiplayer tag in the browser: rooms, sprint stamina, 60 Hz authoritative server."
+      content="Multiplayer zombie survival arena."
     />
-    <meta name="theme-color" content="#0a0d13" />
+
+    <meta name="theme-color" content="#050608" />
+
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
-  <body class="h-full overflow-hidden bg-[#0a0d13] font-sans text-slate-200 select-none">
-    <canvas id="game" class="fixed inset-0 block h-full w-full"></canvas>
 
+  <body
+    class="h-full overflow-hidden bg-[#050608] font-sans text-slate-200 select-none"
+  >
+
+    <!-- ========================================================= -->
+    <!-- GAME CANVAS -->
+    <!-- ========================================================= -->
+
+    <canvas
+      id="game"
+      class="fixed inset-0 block h-full w-full"
+    ></canvas>
+
+
+    <!-- ========================================================= -->
+    <!-- HORROR ATMOSPHERE -->
+    <!-- ========================================================= -->
+
+    <div
+      class="pointer-events-none fixed inset-0 z-[1]"
+      style="
+        background:
+          radial-gradient(
+            circle at center,
+            transparent 35%,
+            rgba(0,0,0,0.25) 65%,
+            rgba(0,0,0,0.85) 100%
+          );
+      "
+    ></div>
+
+    <div
+      class="pointer-events-none fixed inset-0 z-[2] opacity-[0.08]"
+      style="
+        background-image:
+          repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 3px,
+            rgba(255,255,255,0.15) 4px
+          );
+      "
+    ></div>
+
+
+    <!-- ========================================================= -->
     <!-- HUD -->
-    <div id="hud" class="pointer-events-none fixed inset-0 hidden">
+    <!-- ========================================================= -->
+
+    <div
+      id="hud"
+      class="pointer-events-none fixed inset-0 z-10 hidden"
+    >
+
+      <!-- ======================================================= -->
+      <!-- TOP WARNING BAR -->
+      <!-- ======================================================= -->
+
       <div
-        id="timer"
-        class="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg bg-slate-950/60 px-3 py-1 font-mono text-2xl font-bold tracking-widest text-slate-100/90 backdrop-blur"
+        class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-80"
+      ></div>
+
+
+      <!-- ======================================================= -->
+      <!-- SURVIVAL TIMER -->
+      <!-- ======================================================= -->
+
+      <div
+        class="absolute top-5 left-1/2 -translate-x-1/2"
       >
-        --:--
+        <div
+          class="relative min-w-[190px] rounded-xl border border-red-900/60 bg-black/70 px-6 py-2 text-center shadow-[0_0_30px_rgba(220,38,38,0.18)] backdrop-blur-md"
+        >
+
+          <div
+            class="text-[9px] font-bold tracking-[0.35em] text-red-500 uppercase"
+          >
+            SURVIVAL TIME
+          </div>
+
+          <div
+            id="timer"
+            class="mt-0.5 font-mono text-3xl font-black tracking-[0.12em] text-red-100"
+          >
+            --:--
+          </div>
+
+          <div
+            class="absolute -bottom-px left-1/2 h-px w-16 -translate-x-1/2 bg-red-500"
+          ></div>
+
+        </div>
       </div>
+
+
+      <!-- ======================================================= -->
+      <!-- SURVIVAL STATUS PANEL -->
+      <!-- ======================================================= -->
+
       <div
         id="scoreboard"
-        class="absolute top-4 left-4 w-56 space-y-1 rounded-xl border border-slate-800/60 bg-slate-950/60 p-3 text-sm backdrop-blur"
-      ></div>
+        class="absolute top-5 left-5 w-64 overflow-hidden rounded-2xl border border-red-950/70 bg-black/65 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+      >
+
+        <!-- Header -->
+
+        <div
+          class="flex items-center gap-2 border-b border-red-950/60 bg-red-950/20 px-4 py-3"
+        >
+
+          <div
+            class="flex h-7 w-7 items-center justify-center rounded-full border border-red-500/40 bg-red-950/40 text-sm"
+          >
+            ☣
+          </div>
+
+          <div>
+            <div
+              class="text-[9px] font-bold tracking-[0.25em] text-red-500 uppercase"
+            >
+              OUTBREAK STATUS
+            </div>
+
+            <div
+              class="text-xs font-semibold text-slate-300"
+            >
+              LIVE SURVIVAL MONITOR
+            </div>
+          </div>
+
+        </div>
+
+
+        <!-- Survivor count -->
+
+        <div
+          class="flex items-center justify-between px-4 pt-4"
+        >
+
+          <div class="flex items-center gap-2">
+
+            <span
+              class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-sm"
+            >
+              🧍
+            </span>
+
+            <span
+              class="text-xs font-semibold tracking-wide text-slate-400"
+            >
+              SURVIVORS
+            </span>
+
+          </div>
+
+          <span
+            id="survivor-count"
+            class="font-mono text-xl font-black text-emerald-400"
+          >
+            0
+          </span>
+
+        </div>
+
+
+        <!-- Zombie count -->
+
+        <div
+          class="mt-3 flex items-center justify-between px-4"
+        >
+
+          <div class="flex items-center gap-2">
+
+            <span
+              class="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500/10 text-sm"
+            >
+              🧟
+            </span>
+
+            <span
+              class="text-xs font-semibold tracking-wide text-slate-400"
+            >
+              INFECTED
+            </span>
+
+          </div>
+
+          <span
+            id="zombie-count"
+            class="font-mono text-xl font-black text-red-400"
+          >
+            0
+          </span>
+
+        </div>
+
+
+        <!-- Divider -->
+
+        <div class="mx-4 my-4 h-px bg-red-950/60"></div>
+
+
+        <!-- Player status -->
+
+        <div class="px-4 pb-4">
+
+          <div
+            class="mb-2 text-[9px] font-bold tracking-[0.25em] text-slate-600 uppercase"
+          >
+            YOUR STATUS
+          </div>
+
+
+          <div class="flex items-center justify-between">
+
+            <span
+              class="text-xs text-slate-500"
+            >
+              Role
+            </span>
+
+            <span
+              id="role-display"
+              class="rounded-md bg-slate-800/70 px-2 py-1 text-xs font-black tracking-wider text-slate-200 uppercase"
+            >
+              —
+            </span>
+
+          </div>
+
+
+          <div
+            class="mt-3 flex items-center justify-between"
+          >
+
+            <span
+              class="text-xs text-slate-500"
+            >
+              Emergency Vaccine
+            </span>
+
+            <span
+              id="vaccine-count"
+              class="rounded-md border border-cyan-900/60 bg-cyan-950/30 px-2 py-1 font-mono text-sm font-black text-cyan-300"
+            >
+              💉 0
+            </span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- ======================================================= -->
+      <!-- ROOM CODE -->
+      <!-- ======================================================= -->
+
       <button
         id="room-code"
-        class="pointer-events-auto absolute top-4 right-4 cursor-pointer rounded-xl border border-slate-800/60 bg-slate-950/60 px-3 py-2 font-mono text-sm tracking-widest text-sky-300 backdrop-blur hover:bg-slate-800/70"
+        class="pointer-events-auto absolute top-5 right-5 cursor-pointer rounded-xl border border-red-950/70 bg-black/65 px-4 py-3 font-mono text-xs tracking-[0.2em] text-red-300 shadow-[0_0_20px_rgba(0,0,0,0.4)] backdrop-blur-xl transition hover:border-red-500/50 hover:bg-red-950/40"
         title="Copy invite link"
       ></button>
+
+
+      <!-- ======================================================= -->
+      <!-- SPECTATOR -->
+      <!-- ======================================================= -->
+
       <div
         id="spectator"
-        class="absolute top-16 left-1/2 hidden -translate-x-1/2 rounded-lg bg-amber-500/15 px-3 py-1.5 text-sm font-medium text-amber-300 backdrop-blur"
+        class="absolute top-24 left-1/2 hidden -translate-x-1/2 rounded-lg border border-amber-700/40 bg-black/70 px-4 py-2 text-xs font-semibold tracking-wider text-amber-300 uppercase shadow-lg backdrop-blur"
       >
-        Spectating — you join when the next round starts
+        ⚠ Spectating — awaiting next outbreak
       </div>
-      <div id="banner" class="absolute inset-x-0 top-[30%] hidden text-center"></div>
+
+
+      <!-- ======================================================= -->
+      <!-- EVENT / WARNING BANNER -->
+      <!-- ======================================================= -->
+
       <div
-        id="stamina-wrap"
-        class="absolute bottom-6 left-1/2 h-2.5 w-56 -translate-x-1/2 overflow-hidden rounded-full border border-slate-800/80 bg-slate-900/80"
+        id="banner"
+        class="absolute inset-x-0 top-[27%] hidden text-center"
+      ></div>
+
+
+      <!-- ======================================================= -->
+      <!-- STAMINA / ENERGY -->
+      <!-- ======================================================= -->
+
+      <div
+        class="absolute bottom-10 left-1/2 w-64 -translate-x-1/2"
       >
-        <div id="stamina-bar" class="h-full w-full rounded-full bg-emerald-400"></div>
+
+        <div
+          class="mb-1 flex justify-between text-[8px] font-bold tracking-[0.25em] text-slate-600 uppercase"
+        >
+          <span>Emergency Energy</span>
+          <span>SHIFT / SPACE</span>
+        </div>
+
+        <div
+          id="stamina-wrap"
+          class="h-3 w-full overflow-hidden rounded-sm border border-red-950/70 bg-black/80 shadow-inner"
+        >
+
+          <div
+            id="stamina-bar"
+            class="h-full w-full rounded-sm bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+          ></div>
+
+        </div>
+
       </div>
+
+
+      <!-- ======================================================= -->
+      <!-- CONTROLS -->
+      <!-- ======================================================= -->
+
       <div
         id="controls-hint"
-        class="absolute bottom-10 left-1/2 -translate-x-1/2 text-xs text-slate-500"
+        class="absolute bottom-3 left-1/2 -translate-x-1/2 text-center text-[9px] font-medium tracking-wider text-slate-600 uppercase"
       >
-        WASD / arrows to move &middot; hold Shift or Space to sprint
+        WASD / ARROWS TO MOVE &nbsp; • &nbsp; HOLD SHIFT OR SPACE TO SPRINT
       </div>
+
     </div>
 
-    <!-- Touch controls -->
+
+    <!-- ========================================================= -->
+    <!-- TOUCH JOYSTICK -->
+    <!-- ========================================================= -->
+
     <div
       id="joy-base"
-      class="pointer-events-none fixed z-10 hidden h-28 w-28 rounded-full border-2 border-slate-500/40 bg-slate-500/10"
+      class="pointer-events-none fixed z-10 hidden h-28 w-28 rounded-full border-2 border-red-500/20 bg-black/30 shadow-[0_0_25px_rgba(220,38,38,0.08)]"
     ></div>
+
     <div
       id="joy-thumb"
-      class="pointer-events-none fixed z-10 hidden h-12 w-12 rounded-full bg-slate-300/50"
+      class="pointer-events-none fixed z-10 hidden h-12 w-12 rounded-full border border-red-400/30 bg-red-500/20 shadow-[0_0_15px_rgba(220,38,38,0.25)]"
     ></div>
+
+
+    <!-- ========================================================= -->
+    <!-- MOBILE SPRINT -->
+    <!-- ========================================================= -->
+
     <button
       id="btn-sprint"
-      class="fixed right-6 bottom-8 z-10 hidden h-20 w-20 touch-none rounded-full border-2 border-emerald-400/50 bg-emerald-400/15 text-xs font-bold tracking-wider text-emerald-300 active:bg-emerald-400/40"
+      class="fixed right-6 bottom-8 z-10 hidden h-20 w-20 touch-none rounded-full border-2 border-red-500/40 bg-red-950/40 text-xs font-black tracking-widest text-red-300 shadow-[0_0_25px_rgba(220,38,38,0.15)] transition active:scale-95 active:bg-red-600/30"
     >
-      SPRINT
+      RUN
     </button>
 
-    <!-- Podium -->
+
+    <!-- ========================================================= -->
+    <!-- GAME OVER / PODIUM -->
+    <!-- ========================================================= -->
+
     <div
       id="podium"
-      class="fixed inset-0 z-20 hidden items-center justify-center bg-slate-950/70 backdrop-blur-sm"
+      class="fixed inset-0 z-20 hidden items-center justify-center bg-black/85 px-4 backdrop-blur-md"
     >
+
       <div
-        class="w-[min(92vw,420px)] rounded-2xl border border-slate-800 bg-slate-900/90 p-6 text-center shadow-2xl"
+        class="relative w-[min(92vw,460px)] overflow-hidden rounded-3xl border border-red-950 bg-[#090a0d] p-7 text-center shadow-[0_0_80px_rgba(0,0,0,0.9)]"
       >
-        <h2 class="text-2xl font-black tracking-tight text-slate-50">Round over</h2>
-        <ol id="podium-list" class="mt-4 space-y-2 text-left"></ol>
-        <p id="podium-note" class="mt-4 text-sm text-slate-400"></p>
+
+        <!-- Horror glow -->
+
+        <div
+          class="pointer-events-none absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-red-600/10 blur-3xl"
+        ></div>
+
+
+        <!-- Header -->
+
+        <div
+          class="relative"
+        >
+
+          <div
+            class="mb-3 text-4xl"
+          >
+            ☣
+          </div>
+
+          <div
+            class="text-[9px] font-bold tracking-[0.45em] text-red-500 uppercase"
+          >
+            OUTBREAK REPORT
+          </div>
+
+          <h2
+            class="mt-2 text-3xl font-black tracking-tight text-slate-100"
+          >
+            ROUND OVER
+          </h2>
+
+        </div>
+
+
+        <!-- Results -->
+
+        <ol
+          id="podium-list"
+          class="relative mt-6 space-y-2 text-left"
+        ></ol>
+
+
+        <!-- Note -->
+
+        <p
+          id="podium-note"
+          class="relative mt-5 border-t border-red-950/60 pt-4 text-xs leading-relaxed text-slate-500"
+        ></p>
+
+
+        <div
+          class="mt-5 text-[8px] font-bold tracking-[0.3em] text-slate-700 uppercase"
+        >
+          OUTBREAK SYSTEM • SESSION TERMINATED
+        </div>
+
       </div>
+
     </div>
 
-    <!-- Menu -->
-    <div id="menu" class="fixed inset-0 z-30 flex items-center justify-center bg-[#0a0d13]">
+
+    <!-- ========================================================= -->
+    <!-- MAIN MENU -->
+    <!-- ========================================================= -->
+
+    <div
+      id="menu"
+      class="fixed inset-0 z-30 flex items-center justify-center overflow-hidden bg-[#030405]"
+    >
+
+      <!-- Background -->
+
       <div
-        class="w-[min(92vw,400px)] rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl"
+        class="pointer-events-none absolute inset-0"
+        style="
+          background:
+            radial-gradient(
+              circle at 50% 35%,
+              rgba(127,29,29,0.16),
+              transparent 35%
+            ),
+            radial-gradient(
+              circle at 15% 80%,
+              rgba(127,29,29,0.10),
+              transparent 30%
+            );
+        "
+      ></div>
+
+
+      <!-- Scan lines -->
+
+      <div
+        class="pointer-events-none absolute inset-0 opacity-[0.06]"
+        style="
+          background-image:
+            repeating-linear-gradient(
+              0deg,
+              transparent,
+              transparent 4px,
+              rgba(255,255,255,0.12) 5px
+            );
+        "
+      ></div>
+
+
+      <!-- Main card -->
+
+      <div
+        class="relative w-[min(92vw,440px)] overflow-hidden rounded-3xl border border-red-950/80 bg-black/70 p-7 shadow-[0_0_80px_rgba(0,0,0,0.9)] backdrop-blur-xl"
       >
-        <h1 class="text-3xl font-black tracking-tight text-slate-50">
-          tag<span class="text-sky-400">-game</span>
-        </h1>
-        <p class="mt-1 text-sm text-slate-400">
-          Multiplayer tag with an authoritative server. Don't be
-          <span class="font-semibold text-rose-400">it</span> — every second you stay free scores.
-        </p>
+
+        <!-- Top emergency line -->
+
+        <div
+          class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-red-600 to-transparent"
+        ></div>
+
+
+        <!-- Logo -->
+
+        <div class="text-center">
+
+          <div
+            class="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-red-600/40 bg-red-950/20 text-3xl shadow-[0_0_35px_rgba(220,38,38,0.15)]"
+          >
+            ☣
+          </div>
+
+          <div
+            class="mt-5 text-[10px] font-bold tracking-[0.5em] text-red-600 uppercase"
+          >
+            EMERGENCY BROADCAST
+          </div>
+
+          <h1
+            class="mt-2 text-5xl font-black tracking-[-0.04em] text-slate-100"
+          >
+            OUT<span class="text-red-600">BREAK</span>
+          </h1>
+
+          <p
+            class="mt-2 text-xs tracking-widest text-slate-500 uppercase"
+          >
+            Multiplayer Zombie Survival
+          </p>
+
+        </div>
+
+
+        <!-- Warning -->
+
+        <div
+          class="mt-7 rounded-xl border border-red-950/70 bg-red-950/20 p-3"
+        >
+
+          <div
+            class="flex items-start gap-3"
+          >
+
+            <div
+              class="mt-0.5 text-red-500"
+            >
+              ⚠
+            </div>
+
+            <div>
+
+              <div
+                class="text-[9px] font-black tracking-[0.25em] text-red-500 uppercase"
+              >
+                SYSTEM WARNING
+              </div>
+
+              <p
+                class="mt-1 text-xs leading-relaxed text-slate-400"
+              >
+                Infection detected. Stay alive. Avoid the infected.
+                Use emergency vaccines when available.
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- Nickname -->
+
         <label
           for="nickname"
-          class="mt-5 block text-xs font-semibold tracking-wider text-slate-400 uppercase"
+          class="mt-6 block text-[9px] font-bold tracking-[0.3em] text-slate-500 uppercase"
         >
-          Nickname
+          Survivor Identification
         </label>
+
         <input
           id="nickname"
           maxlength="16"
           autocomplete="off"
-          placeholder="e.g. Ada"
-          class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-sky-500"
+          placeholder="ENTER CODENAME"
+          class="mt-2 w-full rounded-xl border border-red-950/70 bg-black/60 px-4 py-3 font-mono text-sm tracking-wider text-slate-100 outline-none transition placeholder:text-slate-700 focus:border-red-600/70 focus:ring-1 focus:ring-red-600/20"
         />
+
+
+        <!-- Create -->
+
         <button
           id="btn-create"
-          class="mt-4 w-full cursor-pointer rounded-lg bg-sky-500 px-4 py-2.5 font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-50"
+          class="mt-4 w-full cursor-pointer rounded-xl border border-red-600/60 bg-red-700/90 px-4 py-3 text-sm font-black tracking-widest text-white uppercase shadow-[0_0_20px_rgba(220,38,38,0.12)] transition hover:bg-red-600 disabled:opacity-50"
         >
-          Create room
+          Enter Outbreak
         </button>
-        <div class="my-4 flex items-center gap-3 text-xs text-slate-500">
-          <span class="h-px flex-1 bg-slate-800"></span>
-          or join with a code
-          <span class="h-px flex-1 bg-slate-800"></span>
+
+
+        <!-- Divider -->
+
+        <div
+          class="my-5 flex items-center gap-3 text-[9px] font-bold tracking-widest text-slate-700 uppercase"
+        >
+
+          <span class="h-px flex-1 bg-red-950/50"></span>
+
+          OR JOIN
+
+          <span class="h-px flex-1 bg-red-950/50"></span>
+
         </div>
+
+
+        <!-- Join -->
+
         <div class="flex gap-2">
+
           <input
             id="code"
             maxlength="4"
             autocomplete="off"
             placeholder="CODE"
-            class="w-28 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-center font-mono tracking-widest text-slate-100 uppercase outline-none focus:border-sky-500"
+            class="w-28 rounded-xl border border-red-950/70 bg-black/60 px-3 py-3 text-center font-mono text-sm tracking-[0.3em] text-slate-100 uppercase outline-none transition placeholder:text-slate-700 focus:border-red-600/70"
           />
+
           <button
             id="btn-join"
-            class="flex-1 cursor-pointer rounded-lg border border-sky-500/60 px-4 py-2 font-semibold text-sky-300 hover:bg-sky-500/10 disabled:opacity-50"
+            class="flex-1 cursor-pointer rounded-xl border border-red-900/70 bg-red-950/20 px-4 py-2 font-bold tracking-wider text-red-300 uppercase transition hover:bg-red-950/40 disabled:opacity-50"
           >
-            Join room
+            Join Survivor Team
           </button>
+
         </div>
-        <p id="menu-error" class="mt-3 hidden text-sm text-rose-400"></p>
-        <p class="mt-5 text-xs text-slate-500">
-          Move with WASD, arrows or the touch joystick. Sprint burns stamina — the server enforces
-          it, so nobody outruns physics.
-        </p>
+
+
+        <!-- Error -->
+
+        <p
+          id="menu-error"
+          class="mt-3 hidden text-sm text-red-400"
+        ></p>
+
+
+        <!-- Footer -->
+
+        <div
+          class="mt-6 border-t border-red-950/40 pt-4 text-center"
+        >
+
+          <p
+            class="text-[9px] leading-relaxed tracking-wider text-slate-600 uppercase"
+          >
+            WASD / ARROWS — MOVE
+            <br />
+            SHIFT / SPACE — SPRINT
+            <br />
+            SURVIVE THE OUTBREAK
+          </p>
+
+        </div>
+
       </div>
+
     </div>
 
-    <script type="module" src="/src/main.ts"></script>
+
+    <!-- ========================================================= -->
+    <!-- APPLICATION -->
+    <!-- ========================================================= -->
+
+    <script
+      type="module"
+      src="/src/main.ts"
+    ></script>
+
   </body>
 </html>

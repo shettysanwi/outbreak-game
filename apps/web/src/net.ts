@@ -61,6 +61,17 @@ export class NetClient {
   onTag(handler: (event: TagBroadcast) => void): void {
     this.socket?.on('tag', handler);
   }
+  onPrivateDecisionOffer(
+  handler: (payload: { eventId: string; timeLimitMs: number }) => void,
+): void {
+  this.socket?.on('privateDecisionOffer', handler);
+}
+sendPrivateDecision(eventId: string, choice: 'survivor' | 'zombie'): void {
+  this.socket?.emit('privateDecisionResponse', {
+    eventId,
+    choice,
+  });
+}
 
   onDisconnect(handler: () => void): void {
     this.socket?.on('disconnect', handler);

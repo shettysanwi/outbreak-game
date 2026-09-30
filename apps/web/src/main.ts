@@ -89,7 +89,7 @@ for (const input of [nicknameInput, codeInput]) {
 function runGame(net: NetClient, selfId: string, roomCode: string): void {
   const canvas = element<HTMLCanvasElement>('game');
   const renderer = new Renderer(canvas);
-  const hud = new Hud(selfId, roomCode);
+  const hud = new Hud(selfId, roomCode, net);
   const buffer = new SnapshotBuffer();
   const predictor = new LocalPredictor(selfId, (input) => {
     net.sendInput(input);
@@ -113,6 +113,9 @@ function runGame(net: NetClient, selfId: string, roomCode: string): void {
     renderer.addFlash(event.x, event.y);
     const involved = event.newItId === selfId || event.oldItId === selfId;
     renderer.addShake(involved ? 14 : 7);
+  });
+    net.onPrivateDecisionOffer((payload) => {
+    hud.showPrivateDecision(payload.eventId, payload.timeLimitMs);
   });
 
   net.onDisconnect(() => {
