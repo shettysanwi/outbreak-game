@@ -12,6 +12,8 @@ function snapshotAt(tick: number, x: number, y: number): Snapshot {
     stamina: 100,
     sprinting: false,
     spectator: false,
+    role: 'survivor',
+    hasVaccine: false,
     scoreMs: 0,
   };
   return {

@@ -191,48 +191,63 @@ describe('room phases and tag rules', () => {
     expect(state.immunityRemainingMs).toBeGreaterThan(0);
   });
 
-  it('tags on contact after immunity, flips "it" and restarts the cooldown', () => {
+    it('infects a survivor when touched by a zombie', () => {
     const options = testOptions();
     const state = createRoomState();
+
     addPlayer(state, 'a', 'Ada', options);
     addPlayer(state, 'b', 'Bob', options);
-    run(state, 200, options); // through countdown into playing
-    run(state, options.tagCooldownMs, options); // burn initial immunity
 
-    const chaser = state.players['a']!;
-    const runner = state.players['b']!;
-    chaser.x = 500;
-    chaser.y = 450;
-    runner.x = 500 + PLAYER_RADIUS * 2 - 1;
-    runner.y = 450;
+    run(state, 200, options);
 
-    const events = stepRoom(state, TICK_MS, options);
-    const tag = events.find((e) => e.type === 'tag');
-    expect(tag).toBeDefined();
-    expect(tag).toMatchObject({ oldItId: 'a', newItId: 'b' });
-    expect(state.itId).toBe('b');
-    expect(state.immunityRemainingMs).toBe(options.tagCooldownMs);
+    state.phase = 'playing';
+
+    const zombie = state.players['a']!;
+    const survivor = state.players['b']!;
+
+    zombie.role = 'zombie';
+    survivor.role = 'survivor';
+    survivor.hasVaccine = false;
+
+    zombie.x = 500;
+    zombie.y = 450;
+    survivor.x = 500 + PLAYER_RADIUS * 2 - 1;
+    survivor.y = 450;
+
+    stepRoom(state, TICK_MS, options);
+
+    expect(zombie.role).toBe('zombie');
+    expect(survivor.role).toBe('zombie');
   });
 
-  it('does not allow an immediate tag-back during the cooldown', () => {
+  it('uses a vaccine to turn a zombie back into a survivor', () => {
     const options = testOptions();
     const state = createRoomState();
+
     addPlayer(state, 'a', 'Ada', options);
     addPlayer(state, 'b', 'Bob', options);
+
     run(state, 200, options);
-    run(state, options.tagCooldownMs, options);
 
-    state.players['a']!.x = 500;
-    state.players['a']!.y = 450;
-    state.players['b']!.x = 500 + PLAYER_RADIUS;
-    state.players['b']!.y = 450;
+    state.phase = 'playing';
+
+    const zombie = state.players['a']!;
+    const survivor = state.players['b']!;
+
+    zombie.role = 'zombie';
+    survivor.role = 'survivor';
+    survivor.hasVaccine = true;
+
+    zombie.x = 500;
+    zombie.y = 450;
+    survivor.x = 500 + PLAYER_RADIUS * 2 - 1;
+    survivor.y = 450;
+
     stepRoom(state, TICK_MS, options);
-    expect(state.itId).toBe('b');
 
-    // Still overlapping on the next ticks, but immunity blocks the tag-back.
-    const events = run(state, options.tagCooldownMs / 2, options);
-    expect(events.filter((e) => e.type === 'tag')).toHaveLength(0);
-    expect(state.itId).toBe('b');
+    expect(zombie.role).toBe('survivor');
+    expect(survivor.role).toBe('survivor');
+    expect(survivor.hasVaccine).toBe(false);
   });
 
   it('scores time NOT being it, and only during play', () => {

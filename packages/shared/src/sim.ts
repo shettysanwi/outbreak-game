@@ -79,6 +79,8 @@ export function addPlayer(
     stamina: STAMINA_MAX,
     sprinting: false,
     spectator: state.phase === 'playing' || state.phase === 'podium',
+    role: 'survivor',
+    hasVaccine: false,
     scoreMs: 0,
     input: idleInput(),
     lastSeq: 0,
@@ -212,9 +214,14 @@ function startCountdown(state: RoomState, options: SimOptions, events: SimEvent[
     player.stamina = STAMINA_MAX;
     player.sprinting = false;
     player.scoreMs = 0;
+    player.role = 'survivor';
+    player.hasVaccine = false;
   });
   const chosen = players[Math.floor(options.rng() * players.length)];
   state.itId = chosen ? chosen.id : null;
+  if (chosen) {
+  chosen.role = 'zombie';
+  }
   state.immunityRemainingMs = 0;
   events.push({ type: 'phase', phase: 'countdown' });
 }
@@ -273,23 +280,24 @@ export function stepRoom(state: RoomState, dtMs: number, options: SimOptions): S
       }
 
       state.immunityRemainingMs = Math.max(0, state.immunityRemainingMs - dtMs);
-      const chaser = state.itId ? state.players[state.itId] : undefined;
-      if (chaser && state.immunityRemainingMs <= 0) {
+      for (const zombie of active) {
+        if (zombie.role !== 'zombie') continue;
+
         for (const player of active) {
-          if (player.id === chaser.id) continue;
-          const dx = player.x - chaser.x;
-          const dy = player.y - chaser.y;
+          if (player.id === zombie.id) continue;
+          if (player.role !== 'survivor') continue;
+
+          const dx = player.x - zombie.x;
+          const dy = player.y - zombie.y;
           const reach = PLAYER_RADIUS * 2;
+
           if (dx * dx + dy * dy <= reach * reach) {
-            events.push({
-              type: 'tag',
-              oldItId: chaser.id,
-              newItId: player.id,
-              x: (player.x + chaser.x) / 2,
-              y: (player.y + chaser.y) / 2,
-            });
-            state.itId = player.id;
-            state.immunityRemainingMs = options.tagCooldownMs;
+            if (player.hasVaccine) {
+              zombie.role = 'survivor';
+              player.hasVaccine = false;
+            } else {
+              player.role = 'zombie';
+            }
             break;
           }
         }

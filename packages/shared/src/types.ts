@@ -34,6 +34,8 @@ export interface SimPlayer extends MovableBody {
   nickname: string;
   colorIndex: number;
   spectator: boolean;
+  role: 'zombie' | 'survivor';
+  hasVaccine: boolean;
   scoreMs: number;
   lastSeq: number;
   joinOrder: number;
@@ -83,6 +85,8 @@ export interface PlayerSnapshot {
   stamina: number;
   sprinting: boolean;
   spectator: boolean;
+  role: 'zombie' | 'survivor';
+  hasVaccine: boolean;
   scoreMs: number;
 }
 
