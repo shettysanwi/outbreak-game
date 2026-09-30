@@ -1,3 +1,4 @@
+
 import { createServer } from 'node:http';
 import type { Server as HttpServer } from 'node:http';
 import { existsSync } from 'node:fs';
@@ -26,9 +27,7 @@ import { RoomManager } from './roomManager';
 export interface GameServerOptions {
   port: number;
   host?: string;
-
   webDistPath?: string | null;
-
   roomOptions?: Partial<SimOptions>;
 }
 
@@ -70,7 +69,7 @@ export async function createGameServer(
 
     const joinBucket = new TokenBucket(3, 0.5);
 
-    socket.on('join', (raw,ack) => {
+    socket.on('join', (raw, ack) => {
       if (typeof ack !== 'function') return;
 
       if (!joinBucket.tryRemove()) {
@@ -122,9 +121,6 @@ export async function createGameServer(
           return;
         }
 
-        /*
-         * Once the host starts the game, no new players can join.
-         */
         if (target.state.phase !== 'waiting') {
           ack({
             ok: false,
@@ -155,11 +151,6 @@ export async function createGameServer(
       });
     });
 
-    /*
-     * HOST ONLY:
-     *
-     * Start the game from the lobby.
-     */
     socket.on('startGame', (_raw, ack) => {
       if (typeof ack !== 'function') return;
 
@@ -187,31 +178,12 @@ export async function createGameServer(
 
       room.queueInput(socket.id, parsed.data);
     });
-    socket.on('privateDecisionResponse', (raw) => {
-  if (!room) return;
-
-  if (
-    !raw ||
-    typeof raw !== 'object' ||
-    typeof (raw as any).eventId !== 'string' ||
-    ((raw as any).choice !== 'survivor' &&
-      (raw as any).choice !== 'zombie')
-  ) {
-    return;
-  }
-
-  room.submitPrivateDecision(
-    socket.id,
-    (raw as any).eventId,
-    (raw as any).choice,
-  );
-});
 
     socket.on('disconnect', () => {
       if (room) {
         manager.leave(room, socket.id);
         room = null;
-      }socket.on
+      }
     });
   });
 

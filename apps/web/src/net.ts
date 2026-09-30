@@ -1,3 +1,4 @@
+
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 
@@ -27,12 +28,17 @@ export class NetClient {
         return;
       }
 
-      const socket: GameSocket = this.socket ?? io();
+      const socket: GameSocket =
+        this.socket ?? io();
 
       this.socket = socket;
 
       const timer = setTimeout(() => {
-        reject(new Error('Could not reach the server.'));
+        reject(
+          new Error(
+            'Could not reach the server.',
+          ),
+        );
       }, 8000);
 
       socket.once('connect', () => {
@@ -40,15 +46,20 @@ export class NetClient {
         resolve();
       });
 
-      socket.once('connect_error', (error) => {
-        clearTimeout(timer);
+      socket.once(
+        'connect_error',
+        (error) => {
+          clearTimeout(timer);
 
-        reject(
-          error instanceof Error
-            ? error
-            : new Error('Connection failed.'),
-        );
-      });
+          reject(
+            error instanceof Error
+              ? error
+              : new Error(
+                  'Connection failed.',
+                ),
+          );
+        },
+      );
     });
   }
 
@@ -67,23 +78,34 @@ export class NetClient {
 
     return new Promise((resolve) => {
       const message = roomCode
-        ? { nickname, roomCode }
-        : { nickname };
-
-      socket.timeout(8000).emit(
-        'join',
-        message,
-        (error, result) => {
-          if (error || !result) {
-            resolve({
-              ok: false,
-              error: 'Join timed out.',
-            });
-          } else {
-            resolve(result);
+        ? {
+            nickname,
+            roomCode,
           }
-        },
-      );
+        : {
+            nickname,
+          };
+
+      socket
+        .timeout(8000)
+        .emit(
+          'join',
+          message,
+          (error, result) => {
+            if (
+              error ||
+              !result
+            ) {
+              resolve({
+                ok: false,
+                error:
+                  'Join timed out.',
+              });
+            } else {
+              resolve(result);
+            }
+          },
+        );
     });
   }
 
@@ -98,52 +120,71 @@ export class NetClient {
     }
 
     return new Promise((resolve) => {
-      socket.timeout(8000).emit(
-        'startGame',
-        {},
-        (error, result) => {
-          if (error || !result) {
-            resolve({
-              ok: false,
-              error: 'Start game request timed out.',
-            });
-          } else {
-            resolve(result);
-          }
-        },
-      );
+      socket
+        .timeout(8000)
+        .emit(
+          'startGame',
+          {},
+          (error, result) => {
+            if (
+              error ||
+              !result
+            ) {
+              resolve({
+                ok: false,
+                error:
+                  'Start game request timed out.',
+              });
+            } else {
+              resolve(result);
+            }
+          },
+        );
     });
   }
 
-  /** Inputs are volatile: a lost packet is stale by the next tick anyway. */
-  sendInput(input: InputMessage): void {
-    this.socket?.volatile.emit('input', input);
+  /**
+   * Inputs are volatile because a lost
+   * movement packet is stale by the next
+   * server tick anyway.
+   */
+  sendInput(
+    input: InputMessage,
+  ): void {
+    this.socket?.volatile.emit(
+      'input',
+      input,
+    );
   }
 
   onSnapshot(
-    handler: (snapshot: Snapshot) => void,
+    handler: (
+      snapshot: Snapshot,
+    ) => void,
   ): void {
-    this.socket?.on('snapshot', handler);
+    this.socket?.on(
+      'snapshot',
+      handler,
+    );
   }
 
   onTag(
-    handler: (event: TagBroadcast) => void,
+    handler: (
+      event: TagBroadcast,
+    ) => void,
   ): void {
-    this.socket?.on('tag', handler);
+    this.socket?.on(
+      'tag',
+      handler,
+    );
   }
-  onPrivateDecisionOffer(
-  handler: (payload: { eventId: string; timeLimitMs: number }) => void,
-): void {
-  this.socket?.on('privateDecisionOffer', handler);
-}
-sendPrivateDecision(eventId: string, choice: 'survivor' | 'zombie'): void {
-  this.socket?.emit('privateDecisionResponse', {
-    eventId,
-    choice,
-  });
-}
 
-  onDisconnect(handler: () => void): void {
-    this.socket?.on('disconnect', handler);
+  onDisconnect(
+    handler: () => void,
+  ): void {
+    this.socket?.on(
+      'disconnect',
+      handler,
+    );
   }
 }
