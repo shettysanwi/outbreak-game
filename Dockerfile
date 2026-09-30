@@ -12,7 +12,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm -r build
-RUN pnpm --filter @tag-game/server deploy --prod /out/server
+RUN pnpm --filter @tag-game/server deploy --prod --legacy /out/server
 
 # Runtime stage: one small image, the server serves the built client.
 FROM node:24-alpine
